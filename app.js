@@ -697,9 +697,11 @@
       '<button class="btn btn-main btn-block" data-act="copyreceipt">复制回执链接</button>' +
       '<button class="mini-btn" data-act="copyintake" style="width:100%;padding:13px">改发文字版（链接不好发时用）</button>' +
       '</div>' +
-      '<div class="done-card"><h4>回执链接（长按可全选复制）</h4>' +
-      '<div class="pre-out" id="receipturl">' + esc(url) + '</div></div>' +
       '<div class="done-card"><h4>你的答复</h4><dl class="kv">' + rows + '</dl></div>' +
+      '<div style="margin-top:18px;text-align:center">' +
+      '<button class="topbar-link" data-act="showraw">复制不了？点这里手工全选链接</button>' +
+      '<div class="pre-out hidden" id="receipturl" style="margin-top:12px;text-align:left">' + esc(url) + '</div>' +
+      '</div>' +
       '<div style="margin-top:22px"><button class="topbar-link" data-go="#/h">返回修改</button></div>' +
       '</div>';
   }
@@ -1557,6 +1559,11 @@
     if (act === 'export') return exportOne(state.lastRecord);
     if (act === 'copyintake') return copyText(intakePlain(state.lastIntake));
     if (act === 'copyreceipt') return copyText(receiptUrl(state.lastIntake));
+    if (act === 'showraw') {
+      var box = $('#receipturl');
+      if (box) box.classList.toggle('hidden');
+      return;
+    }
     if (act === 'exportintake') return exportIntake(state.lastIntake);
     if (act === 'pickfile') { var fi = $('#fileinput'); if (fi) fi.click(); return; }
     if (act === 'pastemode') { var pa = $('#pastearea'); if (pa) pa.classList.toggle('hidden'); return; }
