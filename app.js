@@ -218,7 +218,7 @@
       '<span class="pill">' + HOST.fields.length + ' 题</span>' +
       '<span class="pill">约 4 分钟</span>' +
       '</div>' +
-      '<p class="hero-lead">感谢您安排这次培训。这份问诊单想先了解贵单位的基本情况与这次培训的期待，以便把内容、案例与现场安排准备得更贴合实际。约需 4 分钟，收到后我会与您逐项确认。</p>' +
+      '<p class="hero-lead">为了将本次培训的内容、案例与现场安排准备得更贴合您的培训需求，达成培训预期目标，请填写这份问诊单，约需 4 分钟，收到后我会与您逐项确认，谢谢！</p>' +
       '</div>' +
       '<div class="entry">' +
       '<button class="entry-btn primary" data-go="#/h">' +
