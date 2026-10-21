@@ -115,6 +115,25 @@
     });
   }
 
+  /* 校验失败时，把具体缺项标红，别让人自己找 */
+  function highlightSchoolMisses(f) {
+    var rows = Array.isArray(state.intake[f.id]) ? state.intake[f.id] : [];
+    var els = document.querySelectorAll('.school-row');
+    Array.prototype.forEach.call(els, function (el, i) {
+      var row = rows[i] || {};
+      if (!row.deal) {
+        var d = el.querySelector('.school-deal');
+        if (d) d.classList.add('miss');
+      }
+      (f.facts || []).forEach(function (ft) {
+        if (row[ft.key]) return;
+        var q = el.querySelector('[data-key="' + ft.key + '"]');
+        var box = q ? q.closest('.sfact') : null;
+        if (box) box.classList.add('miss');
+      });
+    });
+  }
+
   /* ---------------- 状态与路由 ---------------- */
   var state = {
     view: 'home',
@@ -204,7 +223,7 @@
       '<h3>两份问卷分别解决什么</h3>' +
       '<ol>' +
       '<li>学校版：学校买到哪一步、用到什么程度、卡在哪一层、这次想要什么</li>' +
-      '<li>团队版：本次涉及哪几所学校、各自签到哪一步、费用、差旅、场地、同场安排，以及客户需求的原话</li>' +
+      '<li>团队版：本次涉及哪几所学校、各自签到哪一步、到校培训过没有、两套系统各用了多久，以及费用、差旅、场地与客户需求的原话</li>' +
       '<li>两份答卷汇总后自动做一致性检查，指出「目标与条件不匹配」的地方</li>' +
       '</ol></div>' +
       '<div class="row" style="margin-top:18px">' +
@@ -277,7 +296,7 @@
     return html;
   }
 
-  /* 学校 + 合同状态：逐行绑定。一所学校一行，状态跟着学校走 */
+  /* 学校 + 合同状态 + 培训与使用情况：逐行绑定。一所学校一行，所有事实跟着学校走 */
   function schoolRows(v) {
     var rows = Array.isArray(v) ? v.filter(function (r) { return r && typeof r === 'object'; }) : [];
     if (!rows.length) rows = [{ name: '', deal: '' }];
@@ -285,6 +304,7 @@
   }
   function renderSchoolRows(f, v) {
     var rows = schoolRows(v);
+    var facts = f.facts || [];
     var html = '<div class="school-rows">';
     rows.forEach(function (row, ri) {
       html += '<div class="school-row" data-srowwrap="' + ri + '">' +
@@ -303,7 +323,37 @@
           ' data-srow-pick="' + f.id + '" data-idx="' + ri + '" data-val="' + esc(op[0]) + '">' +
           '<span class="mark"></span><span class="txt">' + esc(op[1]) + '</span></button>';
       });
-      html += '</div></div>';
+      html += '</div>';
+
+      if (facts.length) {
+        html += '<div class="sfacts">';
+        facts.forEach(function (ft) {
+          var val = row[ft.key] || '';
+          html += '<div class="sfact">' +
+            '<div class="sfact-l">' + esc(ft.label) + '</div>';
+          if (ft.type === 'select') {
+            html += '<select class="sinp' + (val ? ' has' : '') + '" data-srow-sel="' + f.id +
+              '" data-idx="' + ri + '" data-key="' + ft.key + '">' +
+              '<option value=""' + (val ? '' : ' selected') + '>请选择</option>';
+            ft.opts.forEach(function (op) {
+              html += '<option value="' + esc(op[0]) + '"' + (val === op[0] ? ' selected' : '') + '>' +
+                esc(op[1]) + '</option>';
+            });
+            html += '</select>';
+          } else {
+            html += '<div class="pills">';
+            ft.opts.forEach(function (op) {
+              html += '<button type="button" class="pbtn' + (val === op[0] ? ' on' : '') + '"' +
+                ' data-srow-fact="' + f.id + '" data-idx="' + ri + '" data-key="' + ft.key +
+                '" data-val="' + esc(op[0]) + '">' + esc(op[1]) + '</button>';
+            });
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
     });
     html += '</div>';
     html += '<button type="button" class="add-school" data-srow-add="' + f.id + '">' +
@@ -370,6 +420,8 @@
       ['学校', answerText('school', a)],
       ['参训人数', answerText('headcount', a)],
       ['采购状态', answerText('procure', a)],
+      ['ClassIn 使用', answerText('useClassin', a)],
+      ['AIC 使用', answerText('useAic', a)],
       ['期望达成', answerText('endAction', a)],
       ['卡点', answerText('barriers', a)]
     ];
@@ -472,7 +524,20 @@
         if (!rows.length) return;
         L.push('· ' + f.label + '：共 ' + rows.length + ' 所');
         rows.forEach(function (row, i) {
-          L.push('  ' + (i + 1) + '. ' + row.name + ' —— ' + (optLabel(f, row.deal) || '状态未填'));
+          var line = '  ' + (i + 1) + '. ' + row.name + ' —— ' + (optLabel(f, row.deal) || '状态未填');
+          var groups = [], order = [];
+          (f.facts || []).forEach(function (ft) {
+            if (!row[ft.key]) return;
+            var g = ft.group || '';
+            if (order.indexOf(g) < 0) { order.push(g); groups.push([]); }
+            groups[order.indexOf(g)].push(
+              ft.label.replace(/^(培训过|已使用)\s*/, '').replace(/\s*用了$/, '') + ' ' + optLabel(ft, row[ft.key])
+            );
+          });
+          order.forEach(function (g, gi) {
+            line += ' ｜ ' + (g || '其他') + '：' + groups[gi].join('、');
+          });
+          L.push(line);
         });
         return;
       }
@@ -632,6 +697,30 @@
       add('low', '试用期是关键窗口',
         '处在试用阶段，这时的培训本质是「决定要不要继续用」。',
         '内容要服务于一个决策：试用结束前，学校能不能拿出 3 个可复述的使用场景。');
+    }
+
+    /* --- 两套系统各自用到哪一步 --- */
+    var ciOn = a.useClassin === 'yes' || a.useClassin === 'part';
+    var aicOn = a.useAic === 'yes' || a.useAic === 'part';
+    if (a.useClassin === 'no' && aicOn) {
+      add('high', '「AIC 在用、ClassIn 没用」这个组合需要核对',
+        'AIC 的课堂分析与报告，多数情况下依托 ClassIn 的课堂数据跑起来。现在填的是 AIC 已在用、ClassIn 还没开始，可能是填答人口径不同（如把 AIC 当成独立系统），也可能确实是两套并行。',
+        '培训前先核实一句：老师平时从哪里看课、从哪里取报告。这个答案不同，现场演示的入口就不同。');
+    }
+    if (!ciOn && !aicOn) {
+      add('high', '两套都没开始用，培训是「引入」不是「提升」',
+        'ClassIn 与 AIC 都还没进入实际使用。这种状态下，讲「怎么用好」「怎么常态化」都建立在对方无法验证的假设上。',
+        '主线改成「一节课从录到看」的完整示范：只讲一条最短路径，让他们看见成品，其余全砍。目标定为「看懂 + 愿意试第一步」。');
+    }
+    if (ciOn && !aicOn) {
+      add('mid', '平台已在用、课堂分析还没开始，可从熟悉的入口切入',
+        'ClassIn 已经在用，说明老师对界面和上课流程不陌生；AIC 还没开始，卡点通常不是技术，而是不知道看了能干什么。',
+        '从他们每天在用的那个界面进入（一节课、一个班），不要另开一套入口讲。先给一份「像自己课」的报告，再讲怎么用。');
+    }
+    if (aicOn && a.freq === 'none') {
+      add('high', '账号在用，但整体没跑起来',
+        'AIC 已有实际使用，但全校使用频率是「基本没用起来」。这说明问题不在工具可得性，而在动机、流程或没人接。',
+        '培训主线从「怎么操作」转到「谁在什么时候必须用它」：把它嵌进已有的听课、评课、教研流程，并当场指定负责人。');
     }
 
     /* --- 目标 vs 条件 --- */
@@ -1000,9 +1089,47 @@
         var sib = btn.parentNode.children;
         for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
         btn.classList.add('on');
+        var dbox = btn.closest('.school-deal');
+        if (dbox) dbox.classList.remove('miss');
         clearIntakeError(id, null);
         saveJSON(STORE_INTAKE_DRAFT, state.intake);
       };
+    });
+
+    $$('[data-srow-fact]').forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.getAttribute('data-srow-fact');
+        var idx = parseInt(btn.getAttribute('data-idx'), 10);
+        var key = btn.getAttribute('data-key');
+        var rows = ensureRows(id);
+        if (!rows[idx]) rows[idx] = { name: '', deal: '' };
+        rows[idx][key] = btn.getAttribute('data-val');
+        var sib = btn.parentNode.children;
+        for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+        btn.classList.add('on');
+        var box = btn.closest('.sfact');
+        if (box) box.classList.remove('miss');
+        clearIntakeError(id, null);
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+      };
+    });
+
+    $$('[data-srow-sel]').forEach(function (sel) {
+      sel.onchange = function () {
+        var id = sel.getAttribute('data-srow-sel');
+        var idx = parseInt(sel.getAttribute('data-idx'), 10);
+        var key = sel.getAttribute('data-key');
+        var rows = ensureRows(id);
+        if (!rows[idx]) rows[idx] = { name: '', deal: '' };
+        rows[idx][key] = sel.value;
+        sel.classList.toggle('has', !!sel.value);
+        var box = sel.closest('.sfact');
+        if (box && sel.value) box.classList.remove('miss');
+        clearIntakeError(id, null);
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+      };
+      sel.onfocus = function () { var r = sel.closest('.school-row'); if (r) r.classList.add('focus'); };
+      sel.onblur = function () { var r = sel.closest('.school-row'); if (r) r.classList.remove('focus'); };
     });
 
     $$('[data-srow-add]').forEach(function (btn) {
@@ -1161,8 +1288,22 @@
       if (f.type === 'schools') {
         var rows = filledSchools(v);
         if (f.req && !rows.length) { state.intakeErrors[f.id] = true; bad.push(f); return; }
-        var noDeal = rows.filter(function (r) { return !r.deal; });
-        if (noDeal.length) { state.intakeErrors[f.id] = true; bad.push(f); msg = '第 ' + (rows.indexOf(noDeal[0]) + 1) + ' 所学校还没选合同状态'; return; }
+        var missing = [];
+        rows.forEach(function (r, i) {
+          var lack = [];
+          if (!r.deal) lack.push('合同状态');
+          (f.facts || []).forEach(function (ft) { if (!r[ft.key]) lack.push(ft.label); });
+          if (lack.length) {
+            missing.push(lack.length > 2
+              ? '第 ' + (i + 1) + ' 所学校还有 ' + lack.length + ' 项没填'
+              : '第 ' + (i + 1) + ' 所学校缺：' + lack.join('、'));
+          }
+        });
+        if (missing.length) {
+          state.intakeErrors[f.id] = true; bad.push(f);
+          msg = missing[0] + (missing.length > 1 ? '（共 ' + missing.length + ' 所待补）' : '');
+          return;
+        }
         return;
       }
       if (f.req && (v == null || v === '' || (Array.isArray(v) && !v.length))) {
@@ -1171,6 +1312,7 @@
     });
     if (bad.length) {
       render();
+      bad.forEach(function (bf) { if (bf.type === 'schools') highlightSchoolMisses(bf); });
       var el = $('#fld-data-intake-' + bad[0].id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       toast(msg || ('还有 ' + bad.length + ' 道必答题没填'));
@@ -1180,7 +1322,9 @@
     INTAKE.fields.forEach(function (f) {
       if (f.type === 'schools') {
         var rows = filledSchools(state.intake[f.id]).map(function (r) {
-          return { name: String(r.name).trim(), deal: r.deal || '' };
+          var o = { name: String(r.name).trim(), deal: r.deal || '' };
+          (f.facts || []).forEach(function (ft) { o[ft.key] = r[ft.key] || ''; });
+          return o;
         });
         state.intake[f.id] = rows;
       }
