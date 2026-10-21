@@ -191,7 +191,7 @@
   function topbar(right) {
     return '<div class="topbar">' +
       '<div class="brandmark"><div class="branddot"></div>' +
-      '<div class="brandtext">ClassIn 客户培训 · 需求诊断</div></div>' +
+      '<div class="brandtext">铝老师工作室</div></div>' +
       (right || '') + '</div>';
   }
 
@@ -199,40 +199,37 @@
      首页：两份问卷
      =========================================================== */
   function viewHome() {
-    var s = PARAMS.s ? '<div style="margin:0 0 12px"><span class="pill"><span class="dot"></span>本次填报 · ' + esc(PARAMS.s) + '</span></div>' : '';
+    var s = PARAMS.s
+      ? '<div class="hero-meta" style="margin:0 0 14px"><span class="pill"><span class="dot"></span>本次填报 · ' +
+        esc(PARAMS.s) + '</span></div>'
+      : '';
+    var nField = SURVEY.sections.reduce(function (n, sec) { return n + sec.fields.length; }, 0);
     return topbar('') +
       '<div class="hero">' +
       s +
-      '<h1>在排培训之前，<br>先问对<em>问题</em></h1>' +
-      '<p class="hero-lead">一场没做需求诊断的培训，最常见的结局是：讲的人很努力，听的人很客气，一个月后什么都没变。</p>' +
-      '<p class="hero-lead">这套问诊单分两份：一份给学校填，问的是「你们现在到哪一步了」；一份给 ClassIn 团队填，记的是「这次合作的事实边界」。两份合起来，才够设计一场培训。</p>' +
+      '<h1>培训需求问诊单</h1>' +
+      '<div class="hero-meta">' +
+      '<span class="pill">学校填写</span>' +
+      '<span class="pill">' + SURVEY.sections.length + ' 步 · ' + nField + ' 题</span>' +
+      '<span class="pill">约 6 分钟</span>' +
+      '</div>' +
+      '<p class="hero-lead">本问卷用于确定本次培训的目标、对象、内容与现场形式。题目按方案需要确定的变量设置，必答题以紫色标记，其余可以跳过。</p>' +
       '</div>' +
       '<div class="entry">' +
       '<button class="entry-btn primary" data-go="#/s">' +
-      '<span class="entry-icon">校</span>' +
-      '<span><span class="entry-t">培训需求问诊单 · 学校版</span>' +
-      '<span class="entry-d">给校内对接人、教研组长、参训教师 · 约 6 分钟</span></span>' +
-      '<span class="arrow">›</span></button>' +
-      '<button class="entry-btn" data-go="#/i">' +
-      '<span class="entry-icon">团</span>' +
-      '<span><span class="entry-t">培训需求问诊单 · 团队版</span>' +
-      '<span class="entry-d">ClassIn 内部使用 · 逐校商务与使用事实 · 约 5 分钟</span></span>' +
+      '<span class="entry-icon">填</span>' +
+      '<span><span class="entry-t">开始填写</span>' +
+      '<span class="entry-d">中途退出可继续填写 · 填完点「复制答复」发回对接人</span></span>' +
       '<span class="arrow">›</span></button>' +
       '</div>' +
       '<div class="notebox">' +
-      '<h3>两份问卷分别解决什么</h3>' +
+      '<h3>填写须知</h3>' +
       '<ol>' +
-      '<li>学校版：学校买到哪一步、用到什么程度、卡在哪一层，怎么看 AI、已经在用它做什么，这次想要什么</li>' +
-      '<li>团队版：本次涉及哪几所学校、各自签到哪一步、到校培训过没有、两套系统各用了多久，以及费用、差旅、场地与客户需求的原话</li>' +
-      '<li>两份答卷汇总后自动做一致性检查，指出「目标与条件不匹配」的地方</li>' +
+      '<li>请由最了解本次培训安排的校内人员填写；不确定的项选「不清楚」，不必推测。</li>' +
+      '<li>内容仅保存在本机浏览器，不会自动上传；关闭页面后重新打开可继续。</li>' +
+      '<li>所填信息只用于确定培训的形式、分组与材料准备，不作他用。</li>' +
       '</ol></div>' +
-      '<div class="row" style="margin-top:18px">' +
-      '<button class="mini-btn" data-go="#/admin">汇总与诊断</button>' +
-      '<button class="mini-btn" data-go="#/admin?tab=sop">工作流 SOP</button>' +
-      '</div>' +
-      '<div class="footnote">' +
-      '必答题用紫色标记，其余可以整段跳过。填写内容保存在本机浏览器、不会自动上传——填完请点「复制答复」发回对接人。<br>' +
-      '在微信里打开时，请点右上角「···」，选「在浏览器打开」。</div>';
+      '<div class="footnote">在微信内打开时，如页面显示不全，请点右上角「···」，选择「在浏览器打开」。</div>';
   }
 
   /* ===========================================================
