@@ -211,7 +211,7 @@
       '<button class="entry-btn primary" data-go="#/s">' +
       '<span class="entry-icon">校</span>' +
       '<span><span class="entry-t">培训需求问诊单 · 学校版</span>' +
-      '<span class="entry-d">给校内对接人、教研组长、参训教师 · 约 5 分钟</span></span>' +
+      '<span class="entry-d">给校内对接人、教研组长、参训教师 · 约 6 分钟</span></span>' +
       '<span class="arrow">›</span></button>' +
       '<button class="entry-btn" data-go="#/i">' +
       '<span class="entry-icon">团</span>' +
