@@ -222,7 +222,7 @@
       '<div class="notebox">' +
       '<h3>两份问卷分别解决什么</h3>' +
       '<ol>' +
-      '<li>学校版：学校买到哪一步、用到什么程度、卡在哪一层、这次想要什么</li>' +
+      '<li>学校版：学校买到哪一步、用到什么程度、卡在哪一层，怎么看 AI、已经在用它做什么，这次想要什么</li>' +
       '<li>团队版：本次涉及哪几所学校、各自签到哪一步、到校培训过没有、两套系统各用了多久，以及费用、差旅、场地与客户需求的原话</li>' +
       '<li>两份答卷汇总后自动做一致性检查，指出「目标与条件不匹配」的地方</li>' +
       '</ol></div>' +
@@ -723,6 +723,39 @@
         '培训主线从「怎么操作」转到「谁在什么时候必须用它」：把它嵌进已有的听课、评课、教研流程，并当场指定负责人。');
     }
 
+    /* --- 对 AI 的认知与用法 --- */
+    var aiUse = Array.isArray(a.aiUse) ? a.aiUse : (a.aiUse ? [a.aiUse] : []);
+    var aiUsedReal = aiUse.filter(function (x) { return x !== 'none' && x !== 'unknown'; });
+
+    if (a.aiFrame === 'judge') {
+      add('high', '把 AI 当管理工具，第一层阻力是信任',
+        '学校对 AI 的第一判断是「用来检查和评价教师」。在这种认知下，任何数据演示都会被读成「又来查课」，能力展示越充分，抵触越强。',
+        '开场先划边界：报告谁能看到、留多久、用来做什么、明确不进哪些评价场景。这一页讲完再演示，顺序颠倒就救不回来。');
+    }
+    if (a.aiFrame === 'wave') {
+      add('mid', '整体观望，要先给成品再讲道理',
+        '学校判断是「概念大于实用，先观望」。这种状态下讲趋势、讲前景都没有落点，只能先让他们看见一件具体的东西。',
+        '把最前面 15 分钟换成一段真实片段：同一节课的分析前后对比，不做名词解释。先让他们自己判断「这东西是不是真能用」。');
+    }
+    if (a.aiFrame === 'student') {
+      add('mid', '只看学生端，教师端的价值要重新说一遍',
+        '学校认为 AI 的关键在学生，教师端不是重点。带着这个前提来的老师，会把培训当成「又多一项任务」。',
+        '不从「帮老师减负」切入，改从「学生手里有了 AI，老师的判断力反而更值钱」讲：同一份作业、同一道题，老师要能看出哪些不是学生自己做的。');
+    }
+    if (a.aiPolicy === 'none' || a.aiPolicy === 'heard') {
+      add('mid', '缺上位依据，推进全靠个人热情',
+        '学校对上级关于 AI 进课堂的要求还停在「听说过」或「没怎么关注」。没有文件依据，这件事在校内很难变成集体动作，只能靠个别老师自觉。',
+        '培训里加 5 分钟政策与规范参照（用哪几份文件、要求到哪一步、哪些做法有边界），让学校拿得走、也能在行政会上讲清楚。');
+    }
+    var levelHigh = (a.aiLevel === 'chat' || a.aiLevel === 'analytics' || a.aiLevel === 'helper');
+    if ((aiUsedReal.length && a.aiLevel === 'zero') || (!aiUsedReal.length && levelHigh)) {
+      add('mid', '「AI 用法」与「熟悉程度」口径不一致',
+        '熟悉程度填的是「' + answerText('aiLevel', a) + '」，用法一栏填的是「' +
+        (aiUsedReal.length ? answerText('aiUse', a) : '基本没用过 / 不清楚') +
+        '」。两项至少有一项不准，很可能填的是学校的整体印象，而不是老师的真实状态。',
+        '培训前找 1–2 位老师问一句：上周用 AI 做过哪件事。问得出具体的事，按「已经在用」设计；问不出，按 0 基础处理。');
+    }
+
     /* --- 目标 vs 条件 --- */
     if (isAction && dur && dur < 120) {
       add('high', '目标与时长不匹配',
@@ -852,7 +885,7 @@
     ALL_FIELDS.forEach(function (f) {
       if (f.req && !answerText(f.id, a)) gaps.push(f.label + '（必答，未填）');
     });
-    ['priority', 'owner', 'seeds', 'realCase', 'devices', 'wifi', 'account', 'leaderExpect'].forEach(function (id) {
+    ['priority', 'owner', 'seeds', 'realCase', 'devices', 'wifi', 'account', 'leaderExpect', 'aiPolicy'].forEach(function (id) {
       var f = getField(id);
       if (f && !answerText(id, a)) gaps.push(f.label + '（选填，未填——影响方案精度）');
     });
@@ -878,6 +911,7 @@
       audience.push(parts.join(' / '));
     }
     if (a.aiLevel) audience.push('基础：' + answerText('aiLevel', a));
+    if (a.aiFrame) audience.push('认知：' + answerText('aiFrame', a));
     if (a.voluntary) audience.push('来源：' + answerText('voluntary', a));
 
     var mainline = '未判定';
@@ -896,6 +930,17 @@
         privacy: '合规边界——先讲数据归属'
       };
       mainline = '首要卡点：' + answerText('barriers', { barriers: [first] }) + '。主线应走「' + (map[first] || '待定') + '」。';
+    }
+
+    /* 已经在用的那一件事，就是最省力的入口 */
+    if (aiUsedReal.length) {
+      var useMap = {
+        lesson: '备课写教案', quiz: '出题组卷', slide: '做课件找素材', mark: '批改与写评语',
+        paper: '写材料填表', research: '教科研写作', data: '学情数据分析', guide: '指导学生用 AI'
+      };
+      mainline += ' 可用的切入素材：老师已经在用 AI 做' +
+        aiUsedReal.slice(0, 2).map(function (x) { return useMap[x] || x; }).join('、') +
+        '，培训从这件事接过去，不必从零讲起。';
     }
 
     var form;
