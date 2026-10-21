@@ -397,6 +397,61 @@ var INTAKE = {
 };
 
 /* ===========================================================
+   主办方版 —— 对外，海报扫码进来填
+   =========================================================== */
+var HOST = {
+  title: '培训需求问诊单',
+  subtitle: '主办方填写',
+  version: '1.0',
+  desc: '这份由邀请方填写，用于判断这场培训讲什么、讲到哪一层。约 4 分钟。',
+  fields: [
+    { id: 'h_org', label: '邀请单位全称', type: 'text', req: true,
+      ph: '例：××教育集团 / ××实验学校' },
+    { id: 'h_name', label: '联系人姓名与职务', type: 'text', req: true,
+      ph: '例：王××，教师发展中心主任' },
+    { id: 'h_contact', label: '联系方式', type: 'text', req: true,
+      hint: '手机号或微信号，用于确认时间与材料。',
+      ph: '例：13×××××××××' },
+    { id: 'h_type', label: '邀请方属于', type: 'radio', req: true, opts: [
+      ['school', '学校'], ['group', '教育集团 / 教育局'],
+      ['edtech', '教育科技公司'], ['other', '其他机构']
+    ]},
+    { id: 'h_date', label: '拟定的时间', type: 'text', req: false,
+      hint: '不确定可以写「待定」，不影响后续沟通。',
+      ph: '例：2026 年 11 月中旬' },
+    { id: 'h_city', label: '培训地点', type: 'text', req: false,
+      ph: '例：济南市历下区××路××号' },
+    { id: 'h_len', label: '时长与场次', type: 'radio', req: true, opts: [
+      ['h2', '半天，2 小时'], ['h3', '半天，3 小时'],
+      ['day', '一天'], ['multi', '两天以上'], ['undecided', '待定']
+    ]},
+    { id: 'h_who', label: '参训的是哪些人', type: 'checkbox', req: true, opts: [
+      ['teacher', '一线教师'], ['lead', '教研组长 / 备课组长'],
+      ['mid', '中层管理'], ['head', '校长 / 书记'], ['other', '其他']
+    ]},
+    { id: 'h_size', label: '参训人数', type: 'radio', req: true, opts: [
+      ['s50', '50 人以内'], ['s100', '50–100 人'],
+      ['s200', '100–200 人'], ['s300', '200 人以上'], ['unknown', '待定']
+    ]},
+    { id: 'h_stage', label: '目前 AI 进课堂走到哪一步', type: 'radio', req: true, opts: [
+      ['none', '还没有开始'], ['few', '个别老师在试'],
+      ['part', '部分学科在用'], ['all', '已常态化使用'], ['unknown', '说不清']
+    ]},
+    { id: 'h_tool', label: '目前使用的平台或工具', type: 'text', req: false,
+      hint: '有就写，没有写「无」。', ph: '例：ClassIn / 希沃 / 国家智慧教育平台' },
+    { id: 'h_ask', label: '最想解决的一个问题', type: 'textarea', req: true,
+      hint: '只写一个。写得越具体，内容越对得上。',
+      ph: '例：老师手里有课堂分析报告，但不知道下一节课怎么改' },
+    { id: 'h_device', label: '现场条件', type: 'checkbox', req: false, opts: [
+      ['wifi', '有稳定无线'], ['laptop', '老师自带笔记本'],
+      ['room', '有机房或平板'], ['unstable', '网络不稳'], ['unknown', '不确定']
+    ]},
+    { id: 'h_other', label: '同场是否还有别的安排', type: 'text', req: false,
+      hint: '含其他讲师、领导讲话、签约或拍摄。', ph: '例：校长先讲 20 分钟' }
+  ]
+};
+
+/* ===========================================================
    标准工作流 —— 从"收到需求"到"沉淀成果"
    =========================================================== */
 var SOP = [
