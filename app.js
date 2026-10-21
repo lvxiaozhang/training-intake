@@ -5,6 +5,10 @@
   var STORE_RESP = 'ti_responses_v2';
   var STORE_INTAKE_DRAFT = 'ti_intake_draft_v2';
   var STORE_INTAKE_RESP = 'ti_intake_resp_v2';
+  var STORE_HOST_DRAFT = 'ti_host_draft_v1';
+  var STORE_HOST_RESP = 'ti_host_resp_v1';
+  /* 当前渲染的表单：团队版（内部）或主办方版（对外） */
+  var FORM = INTAKE, FORM_DRAFT = STORE_INTAKE_DRAFT, FORM_STORE = STORE_INTAKE_RESP;
 
   /* ---------------- 基础工具 ---------------- */
   function $(s, r) { return (r || document).querySelector(s); }
@@ -95,7 +99,7 @@
     return state.intake[id];
   }
   function intakeField(id) {
-    for (var i = 0; i < INTAKE.fields.length; i++) if (INTAKE.fields[i].id === id) return INTAKE.fields[i];
+    for (var i = 0; i < FORM.fields.length; i++) if (FORM.fields[i].id === id) return FORM.fields[i];
     return null;
   }
   function clearIntakeError(id, inp) {
@@ -165,8 +169,11 @@
     var h = (location.hash || '#/').replace(/^#/, '');
     if (h === '/s') state.view = 'survey';
     else if (h === '/done') state.view = 'done';
+    else if (h === '/h') state.view = 'host';
+    else if (h === '/hdone') state.view = 'hdone';
     else if (h === '/i') state.view = 'intake';
     else if (h === '/idone') state.view = 'idone';
+    else if (h === '/school') state.view = 'schoolhome';
     else if (h.indexOf('/admin') === 0) state.view = 'admin';
     else state.view = 'home';
     render();
@@ -182,6 +189,9 @@
     if (state.view === 'home') app.innerHTML = viewHome();
     else if (state.view === 'survey') app.innerHTML = viewSurvey();
     else if (state.view === 'done') app.innerHTML = viewDone();
+    else if (state.view === 'host') app.innerHTML = viewHost();
+    else if (state.view === 'hdone') app.innerHTML = viewHostDone();
+    else if (state.view === 'schoolhome') app.innerHTML = viewSchoolHome();
     else if (state.view === 'intake') app.innerHTML = viewIntake();
     else if (state.view === 'idone') app.innerHTML = viewIntakeDone();
     else if (state.view === 'admin') app.innerHTML = viewAdmin();
@@ -196,9 +206,41 @@
   }
 
   /* ===========================================================
-     首页：两份问卷
+     首页：主办方版（对外唯一入口）
      =========================================================== */
   function viewHome() {
+    var nReq = HOST.fields.filter(function (f) { return f.req; }).length;
+    return topbar('') +
+      '<div class="hero">' +
+      '<h1>培训需求问诊单</h1>' +
+      '<div class="hero-meta">' +
+      '<span class="pill"><span class="dot"></span>主办方填写</span>' +
+      '<span class="pill">' + HOST.fields.length + ' 题</span>' +
+      '<span class="pill">约 4 分钟</span>' +
+      '</div>' +
+      '<p class="hero-lead">一份培训能不能落地，多半在排课之前就定了。这份单子只问一件事：这场培训要解决哪一个问题。</p>' +
+      '</div>' +
+      '<div class="entry">' +
+      '<button class="entry-btn primary" data-go="#/h">' +
+      '<span class="entry-icon">填</span>' +
+      '<span><span class="entry-t">开始填写</span>' +
+      '<span class="entry-d">必答 ' + nReq + ' 题 · 中途退出可继续 · 填完复制答复发回</span></span>' +
+      '<span class="arrow">›</span></button>' +
+      '</div>' +
+      '<div class="notebox">' +
+      '<h3>填写须知</h3>' +
+      '<ol>' +
+      '<li>请由最了解这次培训安排的人填写。不确定的项可以跳过，不必推测。</li>' +
+      '<li>填完会生成一段文字，复制发回即可；也可直接截图。</li>' +
+      '<li>内容只保存在本机浏览器，不会自动上传，不作他用。</li>' +
+      '</ol></div>' +
+      '<div class="footnote">在微信内打开时，如页面显示不全，请点右上角「···」，选择「在浏览器打开」。</div>';
+  }
+
+  /* ===========================================================
+     学校版首页（由主办方转发给校内对接人）
+     =========================================================== */
+  function viewSchoolHome() {
     var s = PARAMS.s
       ? '<div class="hero-meta" style="margin:0 0 14px"><span class="pill"><span class="dot"></span>本次填报 · ' +
         esc(PARAMS.s) + '</span></div>'
@@ -446,31 +488,47 @@
   /* ===========================================================
      团队版问卷
      =========================================================== */
-  var intakeLoaded = false;
-  function viewIntake() {
-    if (!intakeLoaded) {
-      intakeLoaded = true;
-      state.intake = loadJSON(STORE_INTAKE_DRAFT, {}) || {};
+  /* 主办方版 / 团队版共用同一套渲染与校验，只是取不同的 schema 与存储 */
+  var FORM_META = {
+    host: { label: '主办方版', eyebrow: '主办方填写', draft: STORE_HOST_DRAFT, store: STORE_HOST_RESP,
+            back: '#/', btn: '生成并复制', done: '#/hdone' },
+    team: { label: '团队版', eyebrow: '内部使用 · 客户无需看到', draft: STORE_INTAKE_DRAFT, store: STORE_INTAKE_RESP,
+            back: '#/', btn: '生成交接单', done: '#/idone' }
+  };
+
+  function viewIntake() { return viewForm('team'); }
+  function viewHost() { return viewForm('host'); }
+
+  function viewForm(kind) {
+    var S = kind === 'host' ? HOST : INTAKE;
+    var M = FORM_META[kind];
+    FORM = S; FORM_DRAFT = M.draft; FORM_STORE = M.store;
+
+    if (state.formKind !== kind) {
+      state.formKind = kind;
+      state.intake = loadJSON(M.draft, {}) || {};
+      state.intakeErrors = {};
     }
-    var reqCount = INTAKE.fields.filter(function (f) { return f.req; }).length;
-    var html = topbar('<button class="topbar-link" data-go="#/">退出</button>');
+
+    var reqCount = S.fields.filter(function (f) { return f.req; }).length;
+    var html = topbar('<button class="topbar-link" data-go="' + M.back + '">退出</button>');
     html += '<div class="sticky-head">' +
       '<div class="progress-row">' +
-      '<span class="progress-label">团队版 · 共 ' + INTAKE.fields.length + ' 题</span>' +
+      '<span class="progress-label">' + M.label + ' · 共 ' + S.fields.length + ' 题</span>' +
       '<span class="progress-label">必答 ' + reqCount + '</span>' +
       '</div>' +
       '<div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>' +
       '</div>';
 
     html += '<div class="section-head">' +
-      '<span class="eyebrow">内部使用 · 客户无需看到</span>' +
-      '<h2>' + esc(INTAKE.title) + ' <span class="h2-sub">· 团队版</span></h2>' +
-      '<p>' + esc(INTAKE.desc) + '</p>' +
-      '<div class="secmeta">共 ' + INTAKE.fields.length + ' 题 · 必答 ' + reqCount + ' 题' +
-      (INTAKE.fields.length > reqCount ? ' · 其余可跳过' : '') + '</div>' +
+      '<span class="eyebrow">' + M.eyebrow + '</span>' +
+      '<h2>' + esc(S.title) + ' <span class="h2-sub">· ' + M.label + '</span></h2>' +
+      '<p>' + esc(S.desc) + '</p>' +
+      '<div class="secmeta">共 ' + S.fields.length + ' 题 · 必答 ' + reqCount + ' 题' +
+      (S.fields.length > reqCount ? ' · 其余可跳过' : '') + '</div>' +
       '</div>';
 
-    INTAKE.fields.forEach(function (f, i) {
+    S.fields.forEach(function (f, i) {
       html += renderField(f, i + 1, {
         get: function (id) { return state.intake[id]; },
         attr: 'data-intake', pick: 'data-ipick'
@@ -479,40 +537,53 @@
 
     html += '<div style="height:24px"></div>';
     html += '<div class="survey-actions"><div class="survey-actions-inner">' +
-      '<button class="btn btn-main" data-act="submitintake">生成交接单</button>' +
+      '<button class="btn btn-main" data-act="submitintake">' + M.btn + '</button>' +
       '</div></div>';
     return html;
   }
 
-  function viewIntakeDone() {
-    var r = state.lastIntake;
+  function viewIntakeDone() { return viewFormDone('team'); }
+  function viewHostDone() { return viewFormDone('host'); }
+
+  function viewFormDone(kind) {
+    var r = state.lastForm === kind ? state.lastIntake : null;
     if (!r) {
-      var l = intakeRespList();
-      if (l.length) { r = l[l.length - 1]; state.lastIntake = r; }
+      var l = loadJSON(FORM_META[kind].store, []);
+      if (l.length) r = l[l.length - 1];
     }
+    state.lastIntake = r;
     if (!r) return topbar('') + '<div class="done-wrap"><p>没有可显示的内容。</p></div>';
+
+    var host = kind === 'host';
     return topbar('') +
       '<div class="done-wrap">' +
       '<div class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" ' +
       'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
-      '<h2>交接单已生成</h2>' +
-      '<p>把它发给讲师，或自己留档。学校版答卷回收后，两份一起看，才够设计培训。</p>' +
+      '<h2>' + (host ? '已生成，请发回给讲师' : '交接单已生成') + '</h2>' +
+      '<p>' + (host
+        ? '复制下面这段文字，通过微信发回即可。若复制不便，直接截图也可以。'
+        : '把它发给讲师，或自己留档。学校版答卷回收后，两份一起看，才够设计培训。') + '</p>' +
       '<div class="done-actions">' +
-      '<button class="btn btn-main btn-block" data-act="copyintake">复制交接单</button>' +
+      '<button class="btn btn-main btn-block" data-act="copyintake">' + (host ? '复制并发送' : '复制交接单') + '</button>' +
       '<button class="mini-btn" data-act="exportintake" style="width:100%;padding:13px">导出文件（.json）</button>' +
       '</div>' +
-      '<div class="done-card"><h4>交接单内容</h4>' +
+      '<div class="done-card"><h4>' + (host ? '答复内容' : '交接单内容') + '</h4>' +
       '<div class="pre-out" id="intakeout">' + esc(intakePlain(r)) + '</div></div>' +
-      '<div style="margin-top:22px"><button class="topbar-link" data-go="#/">返回首页</button></div>' +
+      '<div style="margin-top:22px"><button class="topbar-link" data-go="' + (host ? '#/h' : '#/') +
+      '">' + (host ? '返回修改' : '返回首页') + '</button></div>' +
       '</div>';
   }
 
   function intakeRespList() { return loadJSON(STORE_INTAKE_RESP, []); }
 
+  function schemaOf(kind) { return kind === 'host' ? HOST : INTAKE; }
+
   function intakePlain(r) {
     var a = (r && r.answers) || {};
-    var L = ['【培训需求问诊单 · ClassIn 团队填写】', '填写时间：' + ((r && r.submittedAt) || '').slice(0, 16).replace('T', ' '), ''];
-    INTAKE.fields.forEach(function (f) {
+    var kind = (r && r.kind) || 'team';
+    var head = kind === 'host' ? '【培训需求问诊单 · 主办方填写】' : '【培训需求问诊单 · 内部对接】';
+    var L = [head, '填写时间：' + ((r && r.submittedAt) || '').slice(0, 16).replace('T', ' '), ''];
+    schemaOf(kind).fields.forEach(function (f) {
       var v = a[f.id];
       if (v == null || v === '') return;
       if (f.type === 'schools') {
@@ -537,7 +608,12 @@
         });
         return;
       }
-      L.push('· ' + f.label + '：' + (f.type === 'radio' ? optLabel(f, v) : String(v)));
+      if (f.type === 'radio') { L.push('· ' + f.label + '：' + optLabel(f, v)); return; }
+      if (f.type === 'checkbox' && Array.isArray(v)) {
+        L.push('· ' + f.label + '：' + v.map(function (x) { return optLabel(f, x); }).join('、'));
+        return;
+      }
+      L.push('· ' + f.label + '：' + String(v));
     });
     return L.join('\n');
   }
@@ -1086,7 +1162,7 @@
           delete state.intakeErrors[id];
           inp.parentNode.classList.remove('invalid');
         }
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
       });
       inp.addEventListener('focus', function () { inp.parentNode.classList.add('focus'); });
       inp.addEventListener('blur', function () { inp.parentNode.classList.remove('focus'); });
@@ -1100,9 +1176,9 @@
     $$('[data-ipick]').forEach(function (btn) {
       btn.onclick = function () {
         pickOption(btn, 'data-ipick', state.intake, function (id) {
-          for (var i = 0; i < INTAKE.fields.length; i++) if (INTAKE.fields[i].id === id) return INTAKE.fields[i];
+          for (var i = 0; i < FORM.fields.length; i++) if (FORM.fields[i].id === id) return FORM.fields[i];
           return null;
-        }, function () { saveJSON(STORE_INTAKE_DRAFT, state.intake); });
+        }, function () { saveJSON(FORM_DRAFT, state.intake); });
       };
     });
 
@@ -1114,7 +1190,7 @@
         if (!rows[idx]) rows[idx] = { name: '', deal: '' };
         rows[idx].name = inp.value;
         clearIntakeError(id, inp);
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
       });
       inp.addEventListener('focus', function () { inp.parentNode.classList.add('focus'); });
       inp.addEventListener('blur', function () { inp.parentNode.classList.remove('focus'); });
@@ -1133,7 +1209,7 @@
         var dbox = btn.closest('.school-deal');
         if (dbox) dbox.classList.remove('miss');
         clearIntakeError(id, null);
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
       };
     });
 
@@ -1151,7 +1227,7 @@
         var box = btn.closest('.sfact');
         if (box) box.classList.remove('miss');
         clearIntakeError(id, null);
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
       };
     });
 
@@ -1167,7 +1243,7 @@
         var box = sel.closest('.sfact');
         if (box && sel.value) box.classList.remove('miss');
         clearIntakeError(id, null);
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
       };
       sel.onfocus = function () { var r = sel.closest('.school-row'); if (r) r.classList.add('focus'); };
       sel.onblur = function () { var r = sel.closest('.school-row'); if (r) r.classList.remove('focus'); };
@@ -1178,7 +1254,7 @@
         var id = btn.getAttribute('data-srow-add');
         var rows = ensureRows(id);
         rows.push({ name: '', deal: '' });
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
         render();
         var inputs = $$('[data-srow-name="' + id + '"]');
         var last = inputs[inputs.length - 1];
@@ -1196,7 +1272,7 @@
         var rows = ensureRows(id);
         if (rows.length <= 1) return;
         rows.splice(idx, 1);
-        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        saveJSON(FORM_DRAFT, state.intake);
         render();
       };
     });
@@ -1323,8 +1399,9 @@
   }
 
   function submitIntake() {
+    var isHost = FORM === HOST;
     var bad = [], msg = '';
-    INTAKE.fields.forEach(function (f) {
+    FORM.fields.forEach(function (f) {
       var v = state.intake[f.id];
       if (f.type === 'schools') {
         var rows = filledSchools(v);
@@ -1360,7 +1437,7 @@
       return;
     }
     /* 只留填了校名的行，其余空行丢弃 */
-    INTAKE.fields.forEach(function (f) {
+    FORM.fields.forEach(function (f) {
       if (f.type === 'schools') {
         var rows = filledSchools(state.intake[f.id]).map(function (r) {
           var o = { name: String(r.name).trim(), deal: r.deal || '' };
@@ -1371,15 +1448,17 @@
       }
     });
     var record = {
-      id: 'I' + Date.now().toString(36).toUpperCase(),
+      id: (isHost ? 'H' : 'I') + Date.now().toString(36).toUpperCase(),
+      kind: isHost ? 'host' : 'team',
       submittedAt: new Date().toISOString(),
       answers: state.intake
     };
-    var list = intakeRespList();
+    var list = loadJSON(FORM_STORE, []);
     list.push(record);
-    saveJSON(STORE_INTAKE_RESP, list);
+    saveJSON(FORM_STORE, list);
     state.lastIntake = record;
-    location.hash = '#/idone';
+    state.lastForm = isHost ? 'host' : 'team';
+    location.hash = isHost ? '#/hdone' : '#/idone';
   }
 
   function exportOne(r) {
