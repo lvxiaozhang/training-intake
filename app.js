@@ -203,14 +203,13 @@
       ? '<div class="hero-meta" style="margin:0 0 14px"><span class="pill"><span class="dot"></span>本次填报 · ' +
         esc(PARAMS.s) + '</span></div>'
       : '';
-    var nField = SURVEY.sections.reduce(function (n, sec) { return n + sec.fields.length; }, 0);
     return topbar('') +
       '<div class="hero">' +
       s +
       '<h1>培训需求问诊单</h1>' +
       '<div class="hero-meta">' +
       '<span class="pill">学校填写</span>' +
-      '<span class="pill">' + SURVEY.sections.length + ' 步 · ' + nField + ' 题</span>' +
+      '<span class="pill">' + SURVEY.sections.length + ' 步</span>' +
       '<span class="pill">约 6 分钟</span>' +
       '</div>' +
       '<p class="hero-lead">本问卷用于确定本次培训的目标、对象、内容与现场形式。题目按方案需要确定的变量设置，必答题以紫色标记，其余可以跳过。</p>' +
