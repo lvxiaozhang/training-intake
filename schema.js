@@ -282,7 +282,7 @@ var SURVEY = {
           ['desk', '课桌式，可移动'], ['unknown', '不确定']
         ], hint: '固定座椅意味着做不了小组共创，方案要改。' },
         { id: 'duration', label: '可用时长', type: 'number', req: true, unit: '分钟',
-          hint: '从开始到结束的总时长，含中场休息。', ph: '例：120' },
+          hint: '标准场次为 90–120 分钟。若只有一节课（40 分钟），方案要另做取舍。', ph: '例：90 或 120' },
         { id: 'devices', label: '教师现场用什么设备', type: 'radio', req: false, opts: [
           ['laptop', '自带笔记本'], ['pad', '自带平板'],
           ['phone', '只有手机'], ['none', '不带设备'], ['unknown', '不确定']
@@ -421,10 +421,12 @@ var HOST = {
       ph: '例：2026 年 11 月中旬' },
     { id: 'h_city', label: '培训地点', type: 'text', req: false,
       ph: '例：济南市历下区××路××号' },
-    { id: 'h_len', label: '时长与场次', type: 'radio', req: true, opts: [
-      ['h2', '半天，2 小时'], ['h3', '半天，3 小时'],
-      ['day', '一天'], ['multi', '两天以上'], ['undecided', '待定']
-    ]},
+    { id: 'h_len', label: '单场时长', type: 'radio', req: true, opts: [
+      ['m90', '90 分钟'], ['m120', '120 分钟'], ['undecided', '待定']
+    ], hint: '标准场次为 90–120 分钟，含答疑，不按半天或整天计。' },
+    { id: 'h_sess', label: '场次', type: 'radio', req: false, opts: [
+      ['one', '一场'], ['two', '两场'], ['more', '三场及以上'], ['undecided', '待定']
+    ], hint: '连续多场同一天进行也可以，每场之间留 10 分钟换场。' },
     { id: 'h_who', label: '参训的是哪些人', type: 'checkbox', req: true, opts: [
       ['teacher', '一线教师'], ['lead', '教研组长 / 备课组长'],
       ['mid', '中层管理'], ['head', '校长 / 书记'], ['other', '其他']
