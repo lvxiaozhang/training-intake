@@ -378,10 +378,6 @@ var INTAKE = {
       ph: '例：济南市历下区××路××号，××学校（东校区）报告厅' },
     { id: 'i_date', label: '培训日期与时间', type: 'text', req: true,
       ph: '例：2026 年 10 月 30 日（周五）14:00–16:00' },
-    { id: 'i_fee', label: '讲师费用与结算方式', type: 'radio', req: true, opts: [
-      ['fixed', '已明确金额与结算时间'], ['talking', '在谈'],
-      ['unclear', '还没提']
-    ]},
     { id: 'i_travel', label: '差旅安排', type: 'radio', req: true, opts: [
       ['we', '我方负责订票住宿'], ['them', '校方负责'],
       ['self', '讲师自理后报销'], ['unclear', '未定']
