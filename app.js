@@ -71,7 +71,9 @@
   function getField(id) { return FIELD_INDEX[id] || null; }
   function optLabel(f, val) {
     if (!f || !f.opts) return String(val);
-    for (var i = 0; i < f.opts.length; i++) if (f.opts[i][0] === val) return f.opts[i][1];
+    for (var i = 0; i < f.opts.length; i++) {
+      if (f.opts[i][0] === val) return f.opts[i][2] || f.opts[i][1];
+    }
     return String(val);
   }
   function answerText(fid, ans) {
@@ -85,6 +87,32 @@
     if (f.type === 'radio') return optLabel(f, v);
     if (f.type === 'number') return String(v) + (f.unit ? ' ' + f.unit : '');
     return String(v);
+  }
+
+  /* 学校行辅助：保证数组存在、清错、按 id 取团队版字段 */
+  function ensureRows(id) {
+    if (!Array.isArray(state.intake[id])) state.intake[id] = [{ name: '', deal: '' }];
+    return state.intake[id];
+  }
+  function intakeField(id) {
+    for (var i = 0; i < INTAKE.fields.length; i++) if (INTAKE.fields[i].id === id) return INTAKE.fields[i];
+    return null;
+  }
+  function clearIntakeError(id, inp) {
+    if (state.intakeErrors[id]) {
+      delete state.intakeErrors[id];
+      var fld = $('#fld-data-intake-' + id);
+      if (fld) fld.classList.remove('invalid');
+    }
+    if (inp) {
+      var p = inp.parentNode && inp.parentNode.classList.contains('field') ? inp.parentNode : null;
+      if (p) p.classList.remove('invalid');
+    }
+  }
+  function filledSchools(v) {
+    return (Array.isArray(v) ? v : []).filter(function (r) {
+      return r && typeof r === 'object' && String(r.name || '').trim();
+    });
   }
 
   /* ---------------- 状态与路由 ---------------- */
@@ -176,7 +204,7 @@
       '<h3>两份问卷分别解决什么</h3>' +
       '<ol>' +
       '<li>学校版：学校买到哪一步、用到什么程度、卡在哪一层、这次想要什么</li>' +
-      '<li>团队版：合同、费用、差旅、场地、同场安排，以及客户需求的原话</li>' +
+      '<li>团队版：本次涉及哪几所学校、各自签到哪一步、费用、差旅、场地、同场安排，以及客户需求的原话</li>' +
       '<li>两份答卷汇总后自动做一致性检查，指出「目标与条件不匹配」的地方</li>' +
       '</ol></div>' +
       '<div class="row" style="margin-top:18px">' +
@@ -249,6 +277,40 @@
     return html;
   }
 
+  /* 学校 + 合同状态：逐行绑定。一所学校一行，状态跟着学校走 */
+  function schoolRows(v) {
+    var rows = Array.isArray(v) ? v.filter(function (r) { return r && typeof r === 'object'; }) : [];
+    if (!rows.length) rows = [{ name: '', deal: '' }];
+    return rows;
+  }
+  function renderSchoolRows(f, v) {
+    var rows = schoolRows(v);
+    var html = '<div class="school-rows">';
+    rows.forEach(function (row, ri) {
+      html += '<div class="school-row" data-srowwrap="' + ri + '">' +
+        '<div class="school-row-head">' +
+        '<span class="school-no">' + (ri + 1) + '</span>' +
+        '<span class="school-row-t">学校全称与校区</span>' +
+        (rows.length > 1 ? '<button type="button" class="school-del" data-srow-del="' + f.id +
+          '" data-idx="' + ri + '">删除</button>' : '') +
+        '</div>' +
+        '<input class="inp" type="text" data-srow-name="' + f.id + '" data-idx="' + ri + '" value="' +
+        esc(row.name || '') + '" placeholder="例：济南市历下区××实验学校（东校区）">' +
+        '<div class="school-deal-title">这所学校的合同 / 报价状态</div>' +
+        '<div class="opts cols-2 school-deal">';
+      f.opts.forEach(function (op) {
+        html += '<button type="button" class="opt' + (row.deal === op[0] ? ' on' : '') + '"' +
+          ' data-srow-pick="' + f.id + '" data-idx="' + ri + '" data-val="' + esc(op[0]) + '">' +
+          '<span class="mark"></span><span class="txt">' + esc(op[1]) + '</span></button>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+    html += '<button type="button" class="add-school" data-srow-add="' + f.id + '">' +
+      esc(f.addText || '+ 再添加一所学校') + '</button>';
+    return html;
+  }
+
   /* 通用字段渲染 */
   function renderField(f, idx, o) {
     var v = o.get(f.id);
@@ -271,6 +333,8 @@
       html += '<textarea class="inp" ' + o.attr + '="' + f.id + '" maxlength="' + maxlen +
         '" placeholder="' + esc(f.ph || '') + '">' + esc(v || '') + '</textarea>' +
         '<div class="counter" data-counter="' + f.id + '">' + (v || '').length + ' / ' + maxlen + '</div>';
+    } else if (f.type === 'schools') {
+      html += renderSchoolRows(f, v);
     } else {
       var shortAll = f.opts.every(function (x) { return x[1].length <= 8; });
       var cols = (shortAll && f.opts.length > 2 && f.opts.length <= 4) ? ' cols-2' : '';
@@ -286,7 +350,7 @@
       if (f.max) html += '<div class="counter" data-pickcount="' + f.id + '">已选 ' +
         (Array.isArray(v) ? v.length : 0) + ' / 最多 ' + f.max + ' 项</div>';
     }
-    html += '<div class="field-error">这一题需要回答</div>';
+    html += '<div class="field-error">' + esc(f.errMsg || '这一题需要回答') + '</div>';
     html += '</div>';
     return html;
   }
@@ -403,6 +467,15 @@
     INTAKE.fields.forEach(function (f) {
       var v = a[f.id];
       if (v == null || v === '') return;
+      if (f.type === 'schools') {
+        var rows = filledSchools(v);
+        if (!rows.length) return;
+        L.push('· ' + f.label + '：共 ' + rows.length + ' 所');
+        rows.forEach(function (row, i) {
+          L.push('  ' + (i + 1) + '. ' + row.name + ' —— ' + (optLabel(f, row.deal) || '状态未填'));
+        });
+        return;
+      }
       L.push('· ' + f.label + '：' + (f.type === 'radio' ? optLabel(f, v) : String(v)));
     });
     return L.join('\n');
@@ -903,6 +976,63 @@
       };
     });
 
+    $$('[data-srow-name]').forEach(function (inp) {
+      var id = inp.getAttribute('data-srow-name');
+      var idx = parseInt(inp.getAttribute('data-idx'), 10);
+      inp.addEventListener('input', function () {
+        var rows = ensureRows(id);
+        if (!rows[idx]) rows[idx] = { name: '', deal: '' };
+        rows[idx].name = inp.value;
+        clearIntakeError(id, inp);
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+      });
+      inp.addEventListener('focus', function () { inp.parentNode.classList.add('focus'); });
+      inp.addEventListener('blur', function () { inp.parentNode.classList.remove('focus'); });
+    });
+
+    $$('[data-srow-pick]').forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.getAttribute('data-srow-pick');
+        var idx = parseInt(btn.getAttribute('data-idx'), 10);
+        var rows = ensureRows(id);
+        if (!rows[idx]) rows[idx] = { name: '', deal: '' };
+        rows[idx].deal = btn.getAttribute('data-val');
+        var sib = btn.parentNode.children;
+        for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+        btn.classList.add('on');
+        clearIntakeError(id, null);
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+      };
+    });
+
+    $$('[data-srow-add]').forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.getAttribute('data-srow-add');
+        var rows = ensureRows(id);
+        rows.push({ name: '', deal: '' });
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        render();
+        var inputs = $$('[data-srow-name="' + id + '"]');
+        var last = inputs[inputs.length - 1];
+        if (last) {
+          last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          last.focus({ preventScroll: true });
+        }
+      };
+    });
+
+    $$('[data-srow-del]').forEach(function (btn) {
+      btn.onclick = function () {
+        var id = btn.getAttribute('data-srow-del');
+        var idx = parseInt(btn.getAttribute('data-idx'), 10);
+        var rows = ensureRows(id);
+        if (rows.length <= 1) return;
+        rows.splice(idx, 1);
+        saveJSON(STORE_INTAKE_DRAFT, state.intake);
+        render();
+      };
+    });
+
     var fi = $('#fileinput');
     if (fi) fi.onchange = function () { handleFiles(fi.files); fi.value = ''; };
   }
@@ -1025,18 +1155,36 @@
   }
 
   function submitIntake() {
-    var bad = [];
+    var bad = [], msg = '';
     INTAKE.fields.forEach(function (f) {
       var v = state.intake[f.id];
-      if (f.req && (v == null || v === '')) { state.intakeErrors[f.id] = true; bad.push(f); }
+      if (f.type === 'schools') {
+        var rows = filledSchools(v);
+        if (f.req && !rows.length) { state.intakeErrors[f.id] = true; bad.push(f); return; }
+        var noDeal = rows.filter(function (r) { return !r.deal; });
+        if (noDeal.length) { state.intakeErrors[f.id] = true; bad.push(f); msg = '第 ' + (rows.indexOf(noDeal[0]) + 1) + ' 所学校还没选合同状态'; return; }
+        return;
+      }
+      if (f.req && (v == null || v === '' || (Array.isArray(v) && !v.length))) {
+        state.intakeErrors[f.id] = true; bad.push(f);
+      }
     });
     if (bad.length) {
       render();
       var el = $('#fld-data-intake-' + bad[0].id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      toast('还有 ' + bad.length + ' 道必答题没填');
+      toast(msg || ('还有 ' + bad.length + ' 道必答题没填'));
       return;
     }
+    /* 只留填了校名的行，其余空行丢弃 */
+    INTAKE.fields.forEach(function (f) {
+      if (f.type === 'schools') {
+        var rows = filledSchools(state.intake[f.id]).map(function (r) {
+          return { name: String(r.name).trim(), deal: r.deal || '' };
+        });
+        state.intake[f.id] = rows;
+      }
+    });
     var record = {
       id: 'I' + Date.now().toString(36).toUpperCase(),
       submittedAt: new Date().toISOString(),
@@ -1056,7 +1204,9 @@
   }
   function exportIntake(r) {
     if (!r) return;
-    var name = (r.answers.i_customer || '交接单').replace(/[\\/:*?"<>|]/g, '') + '_团队版.json';
+    var rows = filledSchools(r.answers.i_schools);
+    var base = rows.length ? rows[0].name + (rows.length > 1 ? '等' + rows.length + '校' : '') : '交接单';
+    var name = base.replace(/[\\/:*?"<>|]/g, '') + '_团队版.json';
     download(name, JSON.stringify(r, null, 2), 'application/json');
   }
   function stamp() {
