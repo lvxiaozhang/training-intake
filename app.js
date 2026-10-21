@@ -72,6 +72,77 @@
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
   }
 
+  /* ---------------- 回执链接 ----------------
+     纯静态站点没有后端，答复不会自己上传。但整份答复可以压进一条链接：
+     填的人复制链接发微信，收的人点开就直接入库——不用截图，也不用重新打字。
+     压缩用 lz-string（CDN 加载）；取不到时退回不压缩的 base64，两条路都能解。 */
+  function b64urlFromUtf8(str) {
+    var bytes = new TextEncoder().encode(str), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function utf8FromB64url(s) {
+    s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function compactAnswers(rec) {
+    var a = (rec && rec.answers) || {}, o = {};
+    Object.keys(a).forEach(function (k) {
+      var v = a[k];
+      if (v === '' || v == null) return;
+      if (Array.isArray(v) && !v.length) return;
+      o[k] = v;
+    });
+    return o;
+  }
+  function packRec(rec) {
+    var json = JSON.stringify({ i: rec.id, k: rec.kind, t: rec.submittedAt, a: compactAnswers(rec) });
+    if (typeof LZString !== 'undefined' && LZString.compressToEncodedURIComponent) {
+      return 'z' + LZString.compressToEncodedURIComponent(json);
+    }
+    return 'b' + b64urlFromUtf8(json);
+  }
+  function unpackRec(d) {
+    if (!d) throw new Error('empty');
+    var json;
+    if (d.charAt(0) === 'z') {
+      if (typeof LZString === 'undefined') throw new Error('no-lz');
+      json = LZString.decompressFromEncodedURIComponent(d.slice(1));
+    } else if (d.charAt(0) === 'b') {
+      json = utf8FromB64url(d.slice(1));
+    } else {
+      json = utf8FromB64url(d);
+    }
+    if (!json) throw new Error('bad');
+    var o = JSON.parse(json);
+    return { id: o.i, kind: o.k || 'host', submittedAt: o.t, answers: o.a || {} };
+  }
+  function receiptUrl(rec) {
+    return location.origin + location.pathname + '#/recv?d=' + packRec(rec);
+  }
+  function storeOf(kind) {
+    return kind === 'host' ? STORE_HOST_RESP : (kind === 'team' ? STORE_INTAKE_RESP : STORE_RESP);
+  }
+  /* 收到一条回执：能解就入库，重复的不再入 */
+  function ingestReceipt(d) {
+    if (!d) return { ok: false, msg: '链接里没有内容。' };
+    var rec;
+    try { rec = unpackRec(d); }
+    catch (e) {
+      return { ok: false, msg: '这条链接不完整，大概被聊天软件截断了。请对方重新复制一次完整链接发过来。' };
+    }
+    rec.kind = rec.kind || 'host';
+    var key = storeOf(rec.kind);
+    var list = loadJSON(key, []);
+    var dup = false;
+    for (var i = 0; i < list.length; i++) if (list[i].id === rec.id) { dup = true; break; }
+    if (!dup) { list.push(rec); saveJSON(key, list); }
+    return { ok: true, rec: rec, dup: dup };
+  }
+
   /* ---------------- 字段索引 ---------------- */
   var FIELD_INDEX = {};
   var ALL_FIELDS = [];
@@ -158,6 +229,8 @@
     lastRecord: null,
     lastIntake: null,
     expanded: null,
+    expandedH: null,
+    recv: null,
     errors: {},
     intakeErrors: {}
   };
@@ -176,15 +249,28 @@
   function go(hash) { location.hash = hash; }
 
   function route() {
-    var h = (location.hash || '#/').replace(/^#/, '');
-    if (h === '/s') state.view = 'survey';
-    else if (h === '/done') state.view = 'done';
-    else if (h === '/h') state.view = 'host';
-    else if (h === '/hdone') state.view = 'hdone';
-    else if (h === '/i') state.view = 'intake';
-    else if (h === '/idone') state.view = 'idone';
-    else if (h === '/school') state.view = 'schoolhome';
-    else if (h.indexOf('/admin') === 0) state.view = 'admin';
+    var raw = (location.hash || '#/').replace(/^#/, '');
+    var qi = raw.indexOf('?');
+    var path = qi < 0 ? raw : raw.slice(0, qi);
+    var query = {};
+    if (qi >= 0) {
+      raw.slice(qi + 1).split('&').forEach(function (kv) {
+        var p = kv.split('=');
+        if (p[0]) query[p[0]] = p.slice(1).join('=');
+      });
+    }
+    if (path === '/s') state.view = 'survey';
+    else if (path === '/done') state.view = 'done';
+    else if (path === '/h') state.view = 'host';
+    else if (path === '/hdone') state.view = 'hdone';
+    else if (path === '/i') state.view = 'intake';
+    else if (path === '/idone') state.view = 'idone';
+    else if (path === '/school') state.view = 'schoolhome';
+    else if (path === '/recv') {
+      state.view = 'recv';
+      state.recv = ingestReceipt(query.d);
+    }
+    else if (path.indexOf('/admin') === 0) state.view = 'admin';
     else state.view = 'home';
     render();
     window.scrollTo(0, 0);
@@ -205,6 +291,7 @@
     else if (state.view === 'intake') app.innerHTML = viewIntake();
     else if (state.view === 'idone') app.innerHTML = viewIntakeDone();
     else if (state.view === 'admin') app.innerHTML = viewAdmin();
+    else if (state.view === 'recv') app.innerHTML = viewRecv();
     bind();
   }
 
@@ -228,21 +315,21 @@
       '<span class="pill">' + HOST.fields.length + ' 题</span>' +
       '<span class="pill">约 4 分钟</span>' +
       '</div>' +
-      '<p class="hero-lead">为了将本次培训的内容、案例与现场安排准备得更贴合您的培训需求，达成培训预期目标，请填写这份问诊单，约需 4 分钟，收到后我会与您逐项确认，谢谢！</p>' +
+      '<p class="hero-lead">为将本次培训设计与组织得更加符合您的培训需求，请填写这份问诊单，约需 4 分钟，谢谢！</p>' +
       '</div>' +
       '<div class="entry">' +
       '<button class="entry-btn primary" data-go="#/h">' +
       '<span class="entry-icon">填</span>' +
       '<span><span class="entry-t">开始填写</span>' +
-      '<span class="entry-d">必答 ' + nReq + ' 题 · 中途退出可继续 · 填完复制答复发回</span></span>' +
+      '<span class="entry-d">必答 ' + nReq + ' 题 · 中途退出可继续 · 填完生成回执链接发回</span></span>' +
       '<span class="arrow">›</span></button>' +
       '</div>' +
       '<div class="notebox">' +
       '<h3>填写须知</h3>' +
       '<ol>' +
       '<li>请由最了解这次培训安排的人填写；不确定的项可以留空，我会再与您确认。</li>' +
-      '<li>填完会把内容自动复制，打开微信粘贴发给我即可。</li>' +
-      '<li>内容只保存在本机浏览器，不会自动上传，不作他用。</li>' +
+      '<li>填完会生成一条回执链接，复制后发微信给我即可，不用截图，也不用再打一遍字。</li>' +
+      '<li>内容不经过任何服务器，只存在你自己的手机里；回执链接里就是这份答复本身，仅用于本次培训准备。</li>' +
       '</ol></div>' +
       '<div class="footnote">在微信内打开时，如页面显示不全，请点右上角「···」，选择「在浏览器打开」。</div>';
   }
@@ -563,25 +650,90 @@
     }
     state.lastIntake = r;
     if (!r) return topbar('') + '<div class="done-wrap"><p>没有可显示的内容。</p></div>';
+    if (kind === 'host') return viewHostReceipt(r);
 
-    var host = kind === 'host';
     return topbar('') +
       '<div class="done-wrap">' +
       '<div class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" ' +
       'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
-      '<h2>' + (host ? '已复制，请发到微信' : '交接单已生成') + '</h2>' +
-      '<p>' + (host
-        ? '答复内容已复制到剪贴板。请打开微信，粘贴后发送给吕老师，提交才算完成——没有发送，我这边收不到。'
-        : '把它发给讲师，或自己留档。学校版答卷回收后，两份一起看，才够设计培训。') + '</p>' +
+      '<h2>交接单已生成</h2>' +
+      '<p>把它发给讲师，或自己留档。学校版答卷回收后，两份一起看，才够设计培训。</p>' +
       '<div class="done-actions">' +
-      '<button class="btn btn-main btn-block" data-act="copyintake">' + (host ? '再复制一次' : '复制交接单') + '</button>' +
-      (host ? '<div class="done-tip">若无法粘贴，长按下方文字全选后复制。</div>'
-            : '<button class="mini-btn" data-act="exportintake" style="width:100%;padding:13px">导出文件（.json）</button>') +
+      '<button class="btn btn-main btn-block" data-act="copyintake">复制交接单</button>' +
+      '<button class="mini-btn" data-act="exportintake" style="width:100%;padding:13px">导出文件（.json）</button>' +
       '</div>' +
-      '<div class="done-card"><h4>' + (host ? '答复内容' : '交接单内容') + '</h4>' +
+      '<div class="done-card"><h4>交接单内容</h4>' +
       '<div class="pre-out" id="intakeout">' + esc(intakePlain(r)) + '</div></div>' +
-      '<div style="margin-top:22px"><button class="topbar-link" data-go="' + (host ? '#/h' : '#/') +
-      '">' + (host ? '返回修改' : '返回首页') + '</button></div>' +
+      '<div style="margin-top:22px"><button class="topbar-link" data-go="#/">返回首页</button></div>' +
+      '</div>';
+  }
+
+  /* 按 schema 把一个答案翻成中文（主办方版自己没有字段索引，这里单独取） */
+  function hostAnswer(id, a) {
+    var f = null;
+    for (var i = 0; i < HOST.fields.length; i++) if (HOST.fields[i].id === id) { f = HOST.fields[i]; break; }
+    var v = (a || {})[id];
+    if (!f || v == null || v === '') return '';
+    if (Array.isArray(v)) return v.map(function (x) { return optLabel(f, x); }).join('、');
+    if (f.type === 'radio') return optLabel(f, v);
+    return String(v);
+  }
+
+  /* 主办方版：不靠对方打字，把整份答复装进一条链接发回来 */
+  function viewHostReceipt(r) {
+    var url = receiptUrl(r);
+    var a = r.answers || {};
+    var rows = [['机构', a.h_org], ['联系人', a.h_name], ['培训日期', a.h_date], ['城市', a.h_city], ['培训对象', hostAnswer('h_who', a)]]
+      .filter(function (x) { return x[1]; })
+      .map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('');
+
+    return topbar('') +
+      '<div class="done-wrap">' +
+      '<div class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+      '<h2>最后一步：把回执发给我</h2>' +
+      '<p>你的全部答复已经装进下面这条链接。复制后发微信给我，我点开就能看到——不用截图，也不用再打一遍字。</p>' +
+      '<div class="done-actions">' +
+      '<button class="btn btn-main btn-block" data-act="copyreceipt">复制回执链接</button>' +
+      '<button class="mini-btn" data-act="copyintake" style="width:100%;padding:13px">改发文字版（链接不好发时用）</button>' +
+      '</div>' +
+      '<div class="done-card"><h4>回执链接（长按可全选复制）</h4>' +
+      '<div class="pre-out" id="receipturl">' + esc(url) + '</div></div>' +
+      '<div class="done-card"><h4>你的答复</h4><dl class="kv">' + rows + '</dl></div>' +
+      '<div style="margin-top:22px"><button class="topbar-link" data-go="#/h">返回修改</button></div>' +
+      '</div>';
+  }
+
+  /* 收到回执的落地页：解出来就入库，直接给结论 */
+  function viewRecv() {
+    var r = state.recv;
+    if (!r || !r.ok) {
+      return topbar('') + '<div class="done-wrap">' +
+        '<h2>这条回执打不开</h2>' +
+        '<p>' + esc((r && r.msg) || '链接不完整。') + '</p>' +
+        '<div style="margin-top:20px"><button class="topbar-link" data-go="#/">回到首页</button></div>' +
+        '</div>';
+    }
+    var rec = r.rec, a = rec.answers || {};
+    var isHost = rec.kind === 'host';
+    var title = isHost ? (a.h_org || '（未填机构）') : (a.school || '（未填学校）');
+    var meta = isHost
+      ? [a.h_name, a.h_date, a.h_city, hostAnswer('h_who', a)].filter(function (x) { return x; }).join(' · ')
+      : [a.name, a.headcount ? a.headcount + ' 人' : ''].filter(function (x) { return x; }).join(' · ');
+
+    return topbar('') +
+      '<div class="done-wrap">' +
+      '<div class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+      '<h2>' + (r.dup ? '这份已经在你的汇总里了' : '已收到 1 份答复') + '</h2>' +
+      '<p>' + (r.dup ? '同一条回执重复打开，没有重复入库。' : '已存入本机汇总，可以直接看全文、导出，或做诊断。') + '</p>' +
+      '<div class="done-card"><h4>' + esc(title) + '</h4>' +
+      '<div class="rmeta" style="margin-bottom:10px">' + esc(meta) + ' · ' + esc(localStamp(rec.submittedAt)) + '</div>' +
+      '<div class="pre-out">' + esc(intakePlain(rec)) + '</div></div>' +
+      '<div class="done-actions">' +
+      '<button class="btn btn-main btn-block" data-go="#/admin?tab=' + (isHost ? 'host' : 'summary') + '">查看汇总</button>' +
+      '</div>' +
+      '<div style="margin-top:20px"><button class="topbar-link" data-go="#/">回到首页</button></div>' +
       '</div>';
   }
 
@@ -635,12 +787,51 @@
   function viewAdmin() {
     var wantTab = (location.hash.split('tab=')[1] || '').split('&')[0];
     if (wantTab === 'sop') state.tab = 'sop';
+    if (wantTab === 'host') state.tab = 'host';
+    if (wantTab === 'summary') state.tab = 'summary';
     var tabs = '<div class="tabs">' +
-      '<button class="tab' + (state.tab === 'summary' ? ' on' : '') + '" data-tab="summary">答卷汇总</button>' +
+      '<button class="tab' + (state.tab === 'host' ? ' on' : '') + '" data-tab="host">主办方版</button>' +
+      '<button class="tab' + (state.tab === 'summary' ? ' on' : '') + '" data-tab="summary">学校版</button>' +
       '<button class="tab' + (state.tab === 'sop' ? ' on' : '') + '" data-tab="sop">工作流 SOP</button>' +
       '</div>';
-    var body = state.tab === 'sop' ? viewSop() : viewSummary();
+    var body = state.tab === 'sop' ? viewSop()
+      : (state.tab === 'host' ? viewHostList() : viewSummary());
     return topbar('<button class="topbar-link" data-go="#/">返回</button>') + tabs + body;
+  }
+
+  /* 主办方版收回来的答复：一次培训一份，点开看全文 */
+  function viewHostList() {
+    var list = loadJSON(STORE_HOST_RESP, []);
+    var html = '<div class="admin-head"><span class="eyebrow">主办方版</span>' +
+      '<h1>已收到的问诊单</h1>' +
+      '<p class="small muted">当前本机共 ' + list.length + ' 份。对方发来的回执链接，点开即自动存入这里，不需要再粘贴。</p></div>';
+
+    if (!list.length) {
+      html += '<div class="card" style="margin-top:14px;padding:20px;text-align:center">' +
+        '<p class="small muted" style="margin:0">还没有。把对方发来的回执链接点开一次，答复就会出现在这里。</p></div>';
+      return html;
+    }
+
+    html += '<div class="row" style="margin-top:14px">' +
+      '<button class="mini-btn" data-act="exporthost">导出全部 JSON</button>' +
+      '</div>';
+    html += '<div class="resp-list">';
+    list.forEach(function (r, i) {
+      var a = r.answers || {};
+      var meta = [a.h_name, a.h_date, a.h_city, hostAnswer('h_who', a)].filter(function (x) { return x; }).join(' · ');
+      html += '<div class="resp-item">' +
+        '<span class="ridx">' + (i + 1) + '</span>' +
+        '<div class="rmain"><div class="rtitle">' + esc(a.h_org || '（未填机构）') + '</div>' +
+        '<div class="rmeta">' + esc(meta) + (meta ? ' · ' : '') + esc(localStamp(r.submittedAt)) + '</div></div>' +
+        '<button class="del" data-act="expandhost" data-idx="' + i + '">' +
+        (state.expandedH === i ? '收起' : '全文') + '</button>' +
+        '</div>';
+      if (state.expandedH === i) {
+        html += '<div style="padding:0 14px 14px"><div class="pre-out">' + esc(intakePlain(r)) + '</div></div>';
+      }
+    });
+    html += '</div>';
+    return html;
   }
 
   function respList() { return loadJSON(STORE_RESP, []); }
@@ -1344,6 +1535,12 @@
           }
           return;
         }
+        if (act === 'expandhost') {
+          var ih = parseInt(t.getAttribute('data-idx'), 10);
+          state.expandedH = (state.expandedH === ih) ? null : ih;
+          render();
+          return;
+        }
         handleAct(act);
         return;
       }
@@ -1359,12 +1556,14 @@
     if (act === 'copy') return copyText(plainText(state.lastRecord));
     if (act === 'export') return exportOne(state.lastRecord);
     if (act === 'copyintake') return copyText(intakePlain(state.lastIntake));
+    if (act === 'copyreceipt') return copyText(receiptUrl(state.lastIntake));
     if (act === 'exportintake') return exportIntake(state.lastIntake);
     if (act === 'pickfile') { var fi = $('#fileinput'); if (fi) fi.click(); return; }
     if (act === 'pastemode') { var pa = $('#pastearea'); if (pa) pa.classList.toggle('hidden'); return; }
     if (act === 'dopaste') return doPaste();
     if (act === 'csv') return exportCSV();
     if (act === 'exportall') return download('培训问诊_全部答卷_' + stamp() + '.json', JSON.stringify(respList(), null, 2), 'application/json');
+    if (act === 'exporthost') return download('培训问诊_主办方版_' + stamp() + '.json', JSON.stringify(loadJSON(STORE_HOST_RESP, []), null, 2), 'application/json');
     if (act === 'clearall') return clearAll();
   }
 
@@ -1474,8 +1673,7 @@
     saveJSON(FORM_STORE, list);
     state.lastIntake = record;
     state.lastForm = isHost ? 'host' : 'team';
-    /* 主办方版：提交即把答复复制进剪贴板，省掉「再点一次复制」 */
-    if (isHost) copyText(intakePlain(record));
+    /* 主办方版：不再靠对方粘贴长文字，改把答复装进回执链接（完成页一键复制） */
     location.hash = isHost ? '#/hdone' : '#/idone';
   }
 
