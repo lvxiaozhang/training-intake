@@ -14,12 +14,28 @@ var SURVEY = {
     {
       id: 'A',
       title: '您与学校',
-      desc: '先让我们知道该和谁对话、对谁负责。',
+      desc: '先确认您是谁、学校是哪一所，以及这所学校目前的真实使用状态。',
       fields: [
         { id: 'name', label: '您的姓名', type: 'text', req: false, ph: '可留空' },
         { id: 'school', label: '学校全称', type: 'text', req: true,
           hint: '请写全称（含校区）。我们要据此准备与贵校学段、生源匹配的案例，写简称容易配错。',
           ph: '例：济南市××学校（××校区）' },
+        { id: 'useClassin', label: '贵校是否已经开始使用 ClassIn', type: 'radio', req: true,
+          hint: '按贵校当前真实状态选。「签了但没人用」请选「还没开始使用」。这一题决定培训是从零讲起，还是从老师们正在用的界面切进去。',
+          opts: [
+            ['yes', '已经开始使用'],
+            ['part', '部分年级或学科在用'],
+            ['no', '还没开始使用'],
+            ['unknown', '不清楚']
+          ]},
+        { id: 'useAic', label: '贵校是否已经开始使用 AIC（课堂分析）', type: 'radio', req: true,
+          hint: '指课堂观察与分析报告的实际上线使用，不含只听过介绍、只看过演示。',
+          opts: [
+            ['yes', '已经开始使用'],
+            ['part', '部分年级或学科在用'],
+            ['no', '还没开始使用'],
+            ['unknown', '不清楚']
+          ]},
         { id: 'role', label: '您在学校的分工', type: 'radio', req: true, opts: [
           ['principal', '校长 / 书记'],
           ['vice', '教学（德育）副校长'],
@@ -74,7 +90,7 @@ var SURVEY = {
     {
       id: 'C',
       title: 'ClassIn / AIC 的采购与使用现状',
-      desc: '这一段是整份问卷的基础。买没买、用没用起来，决定培训该从哪一层讲起。',
+      desc: '买了没有、买到哪一步、谁在用。这一段决定当天能不能用贵校自己的数据做演示。',
       fields: [
         { id: 'procure', label: '学校目前是否已经采购 / 部署 ClassIn 或 AIC', type: 'radio', req: true,
           hint: '请选最接近实际的一项。签约与部署是两件事，请按当前真实状态选。',
@@ -84,22 +100,6 @@ var SURVEY = {
             ['trial', '正在试用（试用期 / 试点班级）'],
             ['none', '尚未采购，这次是第一次接触'],
             ['unknown', '不清楚采购情况']
-          ]},
-        { id: 'useClassin', label: '贵校是否已经开始使用 ClassIn', type: 'radio', req: true,
-          hint: '按当前真实状态选。「签了但没人用」请选「还没开始使用」。',
-          opts: [
-            ['yes', '已经开始使用'],
-            ['part', '部分年级或学科在用'],
-            ['no', '还没开始使用'],
-            ['unknown', '不清楚']
-          ]},
-        { id: 'useAic', label: '贵校是否已经开始使用 AIC（课堂分析）', type: 'radio', req: true,
-          hint: '指课堂观察与分析报告的实际上线使用，不含只听过介绍。',
-          opts: [
-            ['yes', '已经开始使用'],
-            ['part', '部分年级或学科在用'],
-            ['no', '还没开始使用'],
-            ['unknown', '不清楚']
           ]},
         { id: 'deployed', label: '具体已经用上的是哪些', type: 'checkbox', req: false,
           hint: '可多选。用于区分"只买了平台"还是"课堂分析也在用"。',
