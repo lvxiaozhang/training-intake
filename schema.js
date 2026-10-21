@@ -292,17 +292,19 @@ var INTAKE = {
   desc: '这份由 ClassIn 侧对接人填写。它记录的是商务与执行事实，以及你的判断。客户不必看到。',
   fields: [
     { id: 'i_owner', label: '你的姓名 / 岗位', type: 'text', req: true },
-    { id: 'i_customer', label: '客户学校全称', type: 'text', req: true,
-      hint: '写全称与校区。"××新学校项目"不是一所学校的名字。' },
+    { id: 'i_schools', label: '客户学校与合同状态', type: 'schools', req: true,
+      hint: '一所学校一行，名称写全称与校区（“××新学校项目”不是学校的名字），再单独选这所学校的合同状态。同一个项目里往往几所学校状态不一致，这一栏决定培训能不能用真实数据演示、哪些话能说。',
+      errMsg: '至少填一所学校，并为每所已填的学校选合同状态',
+      addText: '+ 再添加一所学校',
+      opts: [
+        ['signed', '已签合同'], ['quoting', '报价中'],
+        ['internal', '已立项未签', '内部立项，尚未签约'], ['none', '还没谈']
+      ]},
     { id: 'i_city', label: '培训城市与场地地址', type: 'text', req: false,
-      hint: '写到门牌或校区楼栋。讲师需要据此安排行程，场地信息也影响设备与网络判断。',
+      hint: '写到门牌或校区楼栋。讲师需要据此安排行程，场地信息也影响设备与网络判断。多校联办时写实际办会的那一处。',
       ph: '例：济南市历下区××路××号，××学校（东校区）报告厅' },
     { id: 'i_date', label: '培训日期与时间', type: 'text', req: true,
       ph: '例：2026 年 10 月 30 日（周五）14:00–16:00' },
-    { id: 'i_contract', label: '合同 / 报价状态', type: 'radio', req: true, opts: [
-      ['signed', '已签合同'], ['quoting', '报价中'],
-      ['internal', '内部立项，尚未签约'], ['none', '还没谈']
-    ]},
     { id: 'i_fee', label: '讲师费用与结算方式', type: 'radio', req: true, opts: [
       ['fixed', '已明确金额与结算时间'], ['talking', '在谈'],
       ['unclear', '还没提']
