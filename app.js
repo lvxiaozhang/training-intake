@@ -27,6 +27,16 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
   }
+  /* 时间按本机时区显示，不用 UTC */
+  function localStamp(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso).slice(0, 16).replace('T', ' ');
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+      p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
   function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(function () { toast('已复制，可直接粘贴到微信'); },
@@ -231,7 +241,7 @@
       '<h3>填写须知</h3>' +
       '<ol>' +
       '<li>请由最了解这次培训安排的人填写；不确定的项可以留空，我会再与您确认。</li>' +
-      '<li>填完会生成一段文字，复制发回即可；也可直接截图。</li>' +
+      '<li>填完会把内容自动复制，打开微信粘贴发给我即可。</li>' +
       '<li>内容只保存在本机浏览器，不会自动上传，不作他用。</li>' +
       '</ol></div>' +
       '<div class="footnote">在微信内打开时，如页面显示不全，请点右上角「···」，选择「在浏览器打开」。</div>';
@@ -559,13 +569,14 @@
       '<div class="done-wrap">' +
       '<div class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" ' +
       'stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>' +
-      '<h2>' + (host ? '已生成，请发回给讲师' : '交接单已生成') + '</h2>' +
+      '<h2>' + (host ? '已复制，请发到微信' : '交接单已生成') + '</h2>' +
       '<p>' + (host
-        ? '复制下面这段文字，通过微信发回即可。若复制不便，直接截图也可以。'
+        ? '答复内容已复制到剪贴板。请打开微信，粘贴后发送给吕老师，提交才算完成——没有发送，我这边收不到。'
         : '把它发给讲师，或自己留档。学校版答卷回收后，两份一起看，才够设计培训。') + '</p>' +
       '<div class="done-actions">' +
-      '<button class="btn btn-main btn-block" data-act="copyintake">' + (host ? '复制并发送' : '复制交接单') + '</button>' +
-      '<button class="mini-btn" data-act="exportintake" style="width:100%;padding:13px">导出文件（.json）</button>' +
+      '<button class="btn btn-main btn-block" data-act="copyintake">' + (host ? '再复制一次' : '复制交接单') + '</button>' +
+      (host ? '<div class="done-tip">若无法粘贴，长按下方文字全选后复制。</div>'
+            : '<button class="mini-btn" data-act="exportintake" style="width:100%;padding:13px">导出文件（.json）</button>') +
       '</div>' +
       '<div class="done-card"><h4>' + (host ? '答复内容' : '交接单内容') + '</h4>' +
       '<div class="pre-out" id="intakeout">' + esc(intakePlain(r)) + '</div></div>' +
@@ -582,7 +593,7 @@
     var a = (r && r.answers) || {};
     var kind = (r && r.kind) || 'team';
     var head = kind === 'host' ? '【培训需求问诊单 · 主办方填写】' : '【培训需求问诊单 · 内部对接】';
-    var L = [head, '填写时间：' + ((r && r.submittedAt) || '').slice(0, 16).replace('T', ' '), ''];
+    var L = [head, '填写时间：' + localStamp(r && r.submittedAt), ''];
     schemaOf(kind).fields.forEach(function (f) {
       var v = a[f.id];
       if (v == null || v === '') return;
@@ -668,7 +679,7 @@
           '<div class="rmain"><div class="rtitle">' + esc(a.school || '（未填学校）') + '</div>' +
           '<div class="rmeta">' + esc(a.name || answerText('role', a)) +
           ' · ' + esc(a.headcount ? a.headcount + ' 人' : '人数未填') +
-          ' · ' + esc((r.submittedAt || '').slice(0, 16).replace('T', ' ')) + '</div></div>' +
+          ' · ' + esc(localStamp(r.submittedAt)) + '</div></div>' +
           '<button class="del" data-act="expand" data-idx="' + i + '">诊断</button>' +
           '</div>';
         if (state.expanded === i) html += '<div>' + viewDiagnosis(r) + '</div>';
@@ -1086,7 +1097,7 @@
 
   function plainText(r) {
     var a = r.answers || {};
-    var L = ['【培训需求问诊单 · 学校填写】', '提交时间：' + (r.submittedAt || '').slice(0, 16).replace('T', ' '), ''];
+    var L = ['【培训需求问诊单 · 学校填写】', '提交时间：' + localStamp(r.submittedAt), ''];
     SURVEY.sections.forEach(function (sec) {
       var rows = [];
       sec.fields.forEach(function (f) {
@@ -1463,6 +1474,8 @@
     saveJSON(FORM_STORE, list);
     state.lastIntake = record;
     state.lastForm = isHost ? 'host' : 'team';
+    /* 主办方版：提交即把答复复制进剪贴板，省掉「再点一次复制」 */
+    if (isHost) copyText(intakePlain(record));
     location.hash = isHost ? '#/hdone' : '#/idone';
   }
 
@@ -1551,7 +1564,7 @@
     var rows = [heads];
     list.forEach(function (r) {
       var a = r.answers || {};
-      var row = [(r.submittedAt || '').slice(0, 16).replace('T', ' '), r.id || ''];
+      var row = [localStamp(r.submittedAt), r.id || ''];
       ALL_FIELDS.forEach(function (f) { row.push(answerText(f.id, a)); });
       rows.push(row);
     });
