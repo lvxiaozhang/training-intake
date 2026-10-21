@@ -85,6 +85,22 @@ var SURVEY = {
             ['none', '尚未采购，这次是第一次接触'],
             ['unknown', '不清楚采购情况']
           ]},
+        { id: 'useClassin', label: '贵校是否已经开始使用 ClassIn', type: 'radio', req: true,
+          hint: '按当前真实状态选。「签了但没人用」请选「还没开始使用」。',
+          opts: [
+            ['yes', '已经开始使用'],
+            ['part', '部分年级或学科在用'],
+            ['no', '还没开始使用'],
+            ['unknown', '不清楚']
+          ]},
+        { id: 'useAic', label: '贵校是否已经开始使用 AIC（课堂分析）', type: 'radio', req: true,
+          hint: '指课堂观察与分析报告的实际上线使用，不含只听过介绍。',
+          opts: [
+            ['yes', '已经开始使用'],
+            ['part', '部分年级或学科在用'],
+            ['no', '还没开始使用'],
+            ['unknown', '不清楚']
+          ]},
         { id: 'deployed', label: '具体已经用上的是哪些', type: 'checkbox', req: false,
           hint: '可多选。用于区分"只买了平台"还是"课堂分析也在用"。',
           opts: [
@@ -293,12 +309,28 @@ var INTAKE = {
   fields: [
     { id: 'i_owner', label: '你的姓名 / 岗位', type: 'text', req: true },
     { id: 'i_schools', label: '客户学校与合同状态', type: 'schools', req: true,
-      hint: '一所学校一行，名称写全称与校区（“××新学校项目”不是学校的名字），再单独选这所学校的合同状态。同一个项目里往往几所学校状态不一致，这一栏决定培训能不能用真实数据演示、哪些话能说。',
-      errMsg: '至少填一所学校，并为每所已填的学校选合同状态',
+      hint: '一所学校一行，名称写全称与校区（“××新学校项目”不是学校的名字），再逐项填这所学校的事实。同一个项目里往往几所学校状态不一致，这几栏决定培训能不能用真实数据演示、哪些话能说。',
+      errMsg: '每所学校都要填校名、合同状态，以及培训与使用情况；确实不知道的请选「不确定 / 不清楚」',
       addText: '+ 再添加一所学校',
       opts: [
         ['signed', '已签合同'], ['quoting', '报价中'],
         ['internal', '已立项未签', '内部立项，尚未签约'], ['none', '还没谈']
+      ],
+      facts: [
+        { key: 'trainedC', group: '到校培训过', label: '培训过 ClassIn', type: 'pick', req: true, opts: [
+          ['yes', '有'], ['no', '没有'], ['unknown', '不确定']
+        ]},
+        { key: 'trainedA', group: '到校培训过', label: '培训过 AIC', type: 'pick', req: true, opts: [
+          ['yes', '有'], ['no', '没有'], ['unknown', '不确定']
+        ]},
+        { key: 'useC', group: '已使用', label: 'ClassIn 用了', type: 'select', req: true, opts: [
+          ['none', '还没开始'], ['m3', '3 个月以内'], ['m6', '3–6 个月'],
+          ['m12', '6–12 个月'], ['y1', '1 年以上'], ['unknown', '不清楚']
+        ]},
+        { key: 'useA', group: '已使用', label: 'AIC 用了', type: 'select', req: true, opts: [
+          ['none', '还没开始'], ['m3', '3 个月以内'], ['m6', '3–6 个月'],
+          ['m12', '6–12 个月'], ['y1', '1 年以上'], ['unknown', '不清楚']
+        ]}
       ]},
     { id: 'i_city', label: '培训城市与场地地址', type: 'text', req: false,
       hint: '写到门牌或校区楼栋。讲师需要据此安排行程，场地信息也影响设备与网络判断。多校联办时写实际办会的那一处。',
@@ -314,7 +346,7 @@ var INTAKE = {
       ['self', '讲师自理后报销'], ['unclear', '未定']
     ]},
     { id: 'i_ask', label: '客户最初提出的需求原文', type: 'textarea', req: true,
-      hint: '照抄客户原话，不要转述成你认为的意思。原文里藏着真实诉求。',
+      hint: '请照抄客户原话，不要转述成你认为的意思，因为原文里藏着真实诉求。',
       ph: '例：分享学校/教研组/一线教师如何运用 AIC，目标是让老师对 AIC 感兴趣，促进教师使用' },
     { id: 'i_real', label: '你判断客户内部的真实期待', type: 'textarea', req: false,
       hint: '例如：借培训推动二期采购 / 应对上级检查 / 校长真的想推 / 只是维护关系。',
