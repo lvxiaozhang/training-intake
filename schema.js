@@ -403,7 +403,7 @@ var HOST = {
   title: '培训需求问诊单',
   subtitle: '主办方填写',
   version: '1.0',
-  desc: '这份由邀请方填写，用于判断这场培训讲什么、讲到哪一层。约 4 分钟。',
+  desc: '这份由邀请方填写，用于了解贵单位对这次培训的期待与现有基础。约 4 分钟。',
   fields: [
     { id: 'h_org', label: '邀请单位全称', type: 'text', req: true,
       ph: '例：××教育集团 / ××实验学校' },
@@ -442,7 +442,7 @@ var HOST = {
     { id: 'h_tool', label: '目前使用的平台或工具', type: 'text', req: false,
       hint: '有就写，没有写「无」。', ph: '例：ClassIn / 希沃 / 国家智慧教育平台' },
     { id: 'h_ask', label: '最想解决的一个问题', type: 'textarea', req: true,
-      hint: '只写一个。写得越具体，内容越对得上。',
+      hint: '写一个即可；写得越具体，准备越有针对性。',
       ph: '例：老师手里有课堂分析报告，但不知道下一节课怎么改' },
     { id: 'h_device', label: '现场条件', type: 'checkbox', req: false, opts: [
       ['wifi', '有稳定无线'], ['laptop', '老师自带笔记本'],
