@@ -216,7 +216,7 @@
       '<button class="entry-btn" data-go="#/i">' +
       '<span class="entry-icon">团</span>' +
       '<span><span class="entry-t">培训需求问诊单 · 团队版</span>' +
-      '<span class="entry-d">ClassIn 内部使用 · 商务与执行事实 · 约 4 分钟</span></span>' +
+      '<span class="entry-d">ClassIn 内部使用 · 逐校商务与使用事实 · 约 5 分钟</span></span>' +
       '<span class="arrow">›</span></button>' +
       '</div>' +
       '<div class="notebox">' +
