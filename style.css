@@ -383,6 +383,44 @@ textarea.inp{resize:vertical;min-height:88px;line-height:1.65;}
 .tl-body ul{margin:5px 0 0;padding-left:17px;}
 .tl-body li{margin-bottom:3px;}
 
+/* ---------- 学校各行：校名与合同状态绑定 ---------- */
+.school-rows{display:flex;flex-direction:column;gap:9px;margin-top:12px;}
+.school-row{
+  border:1.5px solid var(--line);border-radius:12px;
+  padding:11px 12px 12px;background:var(--line2);
+  transition:border-color .14s ease,background .14s ease;
+}
+.school-row.focus{border-color:var(--brand-line);background:#fff;}
+.school-row-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.school-no{
+  flex:0 0 auto;width:19px;height:19px;border-radius:6px;
+  background:var(--brand-soft);color:var(--brand);
+  font-size:11.5px;font-weight:700;line-height:19px;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.school-row-t{flex:1;font-size:12.5px;color:var(--ink3);font-weight:600;letter-spacing:.01em;}
+.school-del{
+  flex:0 0 auto;background:none;border:0;padding:2px 4px;
+  font-size:12.5px;color:var(--ink4);cursor:pointer;font-family:inherit;
+}
+.school-del:active{color:var(--danger);}
+.school-row .inp{background:#fff;border-color:var(--line);}
+.school-deal-title{
+  font-size:12.5px;color:var(--ink3);margin:11px 0 0;font-weight:600;
+}
+.school-deal{margin-top:7px;gap:7px;}
+.school-rows .school-deal.cols-2{grid-template-columns:1fr 1fr;}
+.school-deal .opt{padding:9px 10px;font-size:13.5px;border-radius:9px;background:#fff;gap:8px;}
+.school-deal .opt .mark{flex:0 0 16px;width:16px;height:16px;margin-top:1px;}
+.school-deal .opt.on .mark::after{width:5px;height:5px;}
+.add-school{
+  width:100%;margin-top:9px;padding:11px;border-radius:11px;
+  border:1.5px dashed var(--brand-line);background:var(--brand-soft);
+  color:var(--brand);font-size:13.5px;font-weight:600;
+  font-family:inherit;cursor:pointer;transition:all .14s ease;
+}
+.add-school:active{background:#E7DDFF;}
+
 /* ---------- Toast ---------- */
 .toast{
   position:fixed;left:50%;bottom:100px;transform:translate(-50%,14px);
